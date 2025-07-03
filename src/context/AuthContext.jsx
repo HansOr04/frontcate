@@ -8,6 +8,7 @@ const initialState = {
   token: null,
   isAuthenticated: false,
   isLoading: true,
+  error: null
 }
 
 const authReducer = (state, action) => {
@@ -19,6 +20,7 @@ const authReducer = (state, action) => {
         token: action.payload.token,
         isAuthenticated: true,
         isLoading: false,
+        error: null
       }
     case 'LOGOUT':
       return {
@@ -27,11 +29,23 @@ const authReducer = (state, action) => {
         token: null,
         isAuthenticated: false,
         isLoading: false,
+        error: null
       }
     case 'SET_LOADING':
       return {
         ...state,
         isLoading: action.payload,
+      }
+    case 'SET_ERROR':
+      return {
+        ...state,
+        error: action.payload,
+        isLoading: false
+      }
+    case 'CLEAR_ERROR':
+      return {
+        ...state,
+        error: null
       }
     case 'UPDATE_USER':
       return {
@@ -48,23 +62,71 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem('token')
-      const user = authService.getCurrentUser()
+      try {
+        console.log('🔄 Initializing auth...')
+        dispatch({ type: 'SET_LOADING', payload: true })
+        
+        const token = authService.getToken()
+        const user = authService.getCurrentUser()
 
-      if (token && user) {
-        try {
-          await authService.verifyToken()
-          dispatch({
-            type: 'LOGIN_SUCCESS',
-            payload: { user, token }
-          })
-        } catch (error) {
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
-          dispatch({ type: 'LOGOUT' })
+        console.log('📊 Auth data from storage:', { 
+          hasToken: !!token, 
+          hasUser: !!user,
+          username: user?.username 
+        })
+
+        if (token && user) {
+          try {
+            console.log('🔍 Verifying token...')
+            // Verificar que el token sigue siendo válido
+            await authService.verifyToken()
+            console.log('✅ Token verified successfully')
+            
+            dispatch({
+              type: 'LOGIN_SUCCESS',
+              payload: { user, token }
+            })
+          } catch (error) {
+            console.error('❌ Token verification failed:', error)
+            // Token inválido, limpiar storage
+            authService.clearAuth()
+            dispatch({ type: 'LOGOUT' })
+          }
+        } else if (token && !user) {
+          console.log('⚠️ Token exists but no user data - attempting to fetch user profile')
+          try {
+            // Intentar obtener el perfil del usuario con el token existente
+            const profileResponse = await authService.getProfile()
+            const userData = profileResponse.data
+            
+            console.log('✅ User profile fetched successfully:', userData.username)
+            
+            // Guardar el usuario en localStorage
+            localStorage.setItem('user', JSON.stringify(userData))
+            
+            dispatch({
+              type: 'LOGIN_SUCCESS',
+              payload: { user: userData, token }
+            })
+          } catch (error) {
+            console.error('❌ Failed to fetch user profile:', error)
+            // Token probablemente inválido, limpiar todo
+            authService.clearAuth()
+            dispatch({ type: 'LOGOUT' })
+          }
+        } else {
+          console.log('⚠️ No auth data found, user not authenticated')
+          // No hay token o usuario, asegurar que el storage esté limpio
+          authService.clearAuth()
+          dispatch({ type: 'SET_LOADING', payload: false })
         }
-      } else {
-        dispatch({ type: 'SET_LOADING', payload: false })
+      } catch (error) {
+        console.error('💥 Auth initialization error:', error)
+        authService.clearAuth()
+        dispatch({ 
+          type: 'SET_ERROR', 
+          payload: 'Error al inicializar la autenticación' 
+        })
       }
     }
 
@@ -74,22 +136,36 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true })
+      dispatch({ type: 'CLEAR_ERROR' })
+      
       const response = await authService.login(credentials)
+      
       dispatch({
         type: 'LOGIN_SUCCESS',
         payload: response.data
       })
+      
       return response
     } catch (error) {
-      dispatch({ type: 'SET_LOADING', payload: false })
+      console.error('Login error:', error)
+      const errorMessage = error.response?.data?.message || 'Error al iniciar sesión'
+      dispatch({ 
+        type: 'SET_ERROR', 
+        payload: errorMessage 
+      })
       throw error
     }
   }
 
   const logout = async () => {
     try {
+      dispatch({ type: 'SET_LOADING', payload: true })
       await authService.logout()
+    } catch (error) {
+      console.error('Logout error:', error)
+      // Aunque falle el logout en el servidor, limpiar localmente
     } finally {
+      authService.clearAuth()
       dispatch({ type: 'LOGOUT' })
     }
   }
@@ -98,11 +174,16 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: 'UPDATE_USER', payload: userData })
   }
 
+  const clearError = () => {
+    dispatch({ type: 'CLEAR_ERROR' })
+  }
+
   const value = {
     ...state,
     login,
     logout,
     updateUser,
+    clearError,
   }
 
   return (

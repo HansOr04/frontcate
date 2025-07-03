@@ -12,7 +12,8 @@ import {
   FormControl,
   InputLabel,
   Select,
-  FormHelperText
+  FormHelperText,
+  Alert
 } from '@mui/material'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { Save, Cancel } from '@mui/icons-material'
@@ -26,46 +27,126 @@ const CatequizandoForm = ({
   onCancel, 
   loading = false 
 }) => {
+  // Preparar datos iniciales
+  const defaultValues = initialData ? {
+    nombres: initialData.nombres || '',
+    apellidos: initialData.apellidos || '',
+    fechaNacimiento: initialData.fechaNacimiento ? dayjs(initialData.fechaNacimiento) : null,
+    documentoIdentidad: initialData.documentoIdentidad || '',
+    tipoDocumento: initialData.tipoDocumento || 'cedula',
+    genero: initialData.genero || '',
+    estadoCivil: initialData.estadoCivil || 'soltero',
+    contacto: {
+      direccion: initialData.contacto?.direccion || '',
+      telefono: initialData.contacto?.telefono || '',
+      email: initialData.contacto?.email || '',
+      ciudad: initialData.contacto?.ciudad || ''
+    },
+    responsable: {
+      nombres: initialData.responsable?.nombres || '',
+      apellidos: initialData.responsable?.apellidos || '',
+      telefono: initialData.responsable?.telefono || '',
+      relacion: initialData.responsable?.relacion || 'madre'
+    }
+  } : {
+    nombres: '',
+    apellidos: '',
+    fechaNacimiento: null,
+    documentoIdentidad: '',
+    tipoDocumento: 'cedula',
+    genero: '',
+    estadoCivil: 'soltero',
+    contacto: {
+      direccion: '',
+      telefono: '',
+      email: '',
+      ciudad: ''
+    },
+    responsable: {
+      nombres: '',
+      apellidos: '',
+      telefono: '',
+      relacion: 'madre'
+    }
+  }
+
   const {
     register,
     handleSubmit,
     control,
-    formState: { errors }
+    formState: { errors },
+    watch,
+    setValue
   } = useForm({
     resolver: yupResolver(catequizandoSchema),
-    defaultValues: initialData ? {
-      ...initialData,
-      fechaNacimiento: initialData.fechaNacimiento ? dayjs(initialData.fechaNacimiento) : null
-    } : {
-      nombres: '',
-      apellidos: '',
-      fechaNacimiento: null,
-      documentoIdentidad: '',
-      tipoDocumento: 'cedula',
-      genero: '',
-      estadoCivil: 'soltero',
-      contacto: {
-        direccion: '',
-        telefono: '',
-        email: '',
-        ciudad: ''
-      },
-      responsable: {
-        nombres: '',
-        apellidos: '',
-        telefono: '',
-        relacion: 'padre'
-      }
-    }
+    defaultValues
   })
 
-  const onFormSubmit = (data) => {
-    const formattedData = {
+  console.log('📝 Form errors:', errors)
+  console.log('📝 Form data:', watch())
+
+  // Actualizar la función onFormSubmit en CatequizandoForm.jsx
+
+const onFormSubmit = (data) => {
+  try {
+    console.log('📝 Form submitted with raw data:', data)
+    console.log('📅 Raw fechaNacimiento:', data.fechaNacimiento)
+    console.log('📅 Es dayjs object?:', data.fechaNacimiento?.$isDayjsObject)
+    
+    // ✅ Limpiar y validar datos antes de enviar
+    const cleanedData = {
       ...data,
-      fechaNacimiento: data.fechaNacimiento ? data.fechaNacimiento.toISOString() : null
+      // Convertir fecha dayjs a string
+      fechaNacimiento: data.fechaNacimiento && data.fechaNacimiento.isValid() 
+        ? data.fechaNacimiento.format('YYYY-MM-DD') 
+        : null,
+      
+      // Limpiar strings
+      nombres: data.nombres?.trim(),
+      apellidos: data.apellidos?.trim(),
+      documentoIdentidad: data.documentoIdentidad?.trim(),
+      
+      // Limpiar contacto
+      contacto: {
+        direccion: data.contacto?.direccion?.trim(),
+        telefono: data.contacto?.telefono?.trim().replace(/\s+/g, ''),
+        ciudad: data.contacto?.ciudad?.trim(),
+        email: data.contacto?.email?.trim() || undefined
+      },
+      
+      // Limpiar responsable (convertir strings vacíos a null)
+      responsable: {
+        nombres: data.responsable?.nombres?.trim() || null,
+        apellidos: data.responsable?.apellidos?.trim() || null,
+        telefono: data.responsable?.telefono?.trim() || null,
+        relacion: data.responsable?.relacion || 'madre'
+      }
     }
-    onSubmit(formattedData)
+    
+    console.log('🧹 Cleaned data for API:', cleanedData)
+    console.log('📅 Final fechaNacimiento:', cleanedData.fechaNacimiento)
+    
+    // Validación adicional antes de enviar
+    if (!cleanedData.nombres || !cleanedData.apellidos || !cleanedData.documentoIdentidad) {
+      console.error('❌ Faltan campos requeridos')
+      return
+    }
+    
+    if (!cleanedData.fechaNacimiento) {
+      console.error('❌ Fecha de nacimiento inválida')
+      return
+    }
+    
+    if (!cleanedData.contacto?.direccion || !cleanedData.contacto?.telefono || !cleanedData.contacto?.ciudad) {
+      console.error('❌ Información de contacto incompleta')
+      return
+    }
+    
+    onSubmit(cleanedData)
+  } catch (error) {
+    console.error('❌ Error formatting form data:', error)
   }
+}
 
   return (
     <Card>
@@ -73,6 +154,13 @@ const CatequizandoForm = ({
         <Typography variant="h5" gutterBottom>
           {initialData ? 'Editar Catequizando' : 'Nuevo Catequizando'}
         </Typography>
+
+        {/* Mostrar errores generales si los hay */}
+        {Object.keys(errors).length > 0 && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            Por favor corrige los errores en el formulario antes de continuar.
+          </Alert>
+        )}
 
         <Box component="form" onSubmit={handleSubmit(onFormSubmit)}>
           <Grid container spacing={3}>
@@ -86,22 +174,24 @@ const CatequizandoForm = ({
             <Grid item xs={12} md={6}>
               <TextField
                 {...register('nombres')}
-                label="Nombres"
+                label="Nombres *"
                 fullWidth
                 error={!!errors.nombres}
                 helperText={errors.nombres?.message}
                 disabled={loading}
+                placeholder="Ej: Juan Carlos"
               />
             </Grid>
 
             <Grid item xs={12} md={6}>
               <TextField
                 {...register('apellidos')}
-                label="Apellidos"
+                label="Apellidos *"
                 fullWidth
                 error={!!errors.apellidos}
                 helperText={errors.apellidos?.message}
                 disabled={loading}
+                placeholder="Ej: Pérez García"
               />
             </Grid>
 
@@ -109,17 +199,18 @@ const CatequizandoForm = ({
               <Controller
                 name="fechaNacimiento"
                 control={control}
-                render={({ field }) => (
+                render={({ field, fieldState }) => (
                   <DatePicker
-                    label="Fecha de Nacimiento"
+                    label="Fecha de Nacimiento *"
                     value={field.value}
                     onChange={field.onChange}
                     disabled={loading}
+                    maxDate={dayjs()}
                     slotProps={{
                       textField: {
                         fullWidth: true,
-                        error: !!errors.fechaNacimiento,
-                        helperText: errors.fechaNacimiento?.message
+                        error: !!fieldState.error,
+                        helperText: fieldState.error?.message
                       }
                     }}
                   />
@@ -129,16 +220,19 @@ const CatequizandoForm = ({
 
             <Grid item xs={12} md={6}>
               <FormControl fullWidth error={!!errors.genero}>
-                <InputLabel>Género</InputLabel>
+                <InputLabel>Género *</InputLabel>
                 <Controller
                   name="genero"
                   control={control}
                   render={({ field }) => (
                     <Select
                       {...field}
-                      label="Género"
+                      label="Género *"
                       disabled={loading}
                     >
+                      <MenuItem value="">
+                        <em>Seleccionar género</em>
+                      </MenuItem>
                       {GENEROS.map((genero) => (
                         <MenuItem key={genero.value} value={genero.value}>
                           {genero.label}
@@ -179,11 +273,12 @@ const CatequizandoForm = ({
             <Grid item xs={12} md={6}>
               <TextField
                 {...register('documentoIdentidad')}
-                label="Número de Documento"
+                label="Número de Documento *"
                 fullWidth
                 error={!!errors.documentoIdentidad}
                 helperText={errors.documentoIdentidad?.message}
                 disabled={loading}
+                placeholder="Ej: 1234567890"
               />
             </Grid>
 
@@ -220,35 +315,38 @@ const CatequizandoForm = ({
             <Grid item xs={12}>
               <TextField
                 {...register('contacto.direccion')}
-                label="Dirección"
+                label="Dirección *"
                 fullWidth
                 multiline
                 rows={2}
                 error={!!errors.contacto?.direccion}
                 helperText={errors.contacto?.direccion?.message}
                 disabled={loading}
+                placeholder="Ej: Av. Principal 123, Sector Norte"
               />
             </Grid>
 
             <Grid item xs={12} md={6}>
               <TextField
                 {...register('contacto.telefono')}
-                label="Teléfono"
+                label="Teléfono *"
                 fullWidth
                 error={!!errors.contacto?.telefono}
                 helperText={errors.contacto?.telefono?.message}
                 disabled={loading}
+                placeholder="Ej: 0987654321"
               />
             </Grid>
 
             <Grid item xs={12} md={6}>
               <TextField
                 {...register('contacto.ciudad')}
-                label="Ciudad"
+                label="Ciudad *"
                 fullWidth
                 error={!!errors.contacto?.ciudad}
                 helperText={errors.contacto?.ciudad?.message}
                 disabled={loading}
+                placeholder="Ej: Quito"
               />
             </Grid>
 
@@ -261,6 +359,7 @@ const CatequizandoForm = ({
                 error={!!errors.contacto?.email}
                 helperText={errors.contacto?.email?.message}
                 disabled={loading}
+                placeholder="Ej: correo@ejemplo.com"
               />
             </Grid>
 
@@ -277,6 +376,7 @@ const CatequizandoForm = ({
                 label="Nombres del Responsable"
                 fullWidth
                 disabled={loading}
+                placeholder="Ej: María Elena"
               />
             </Grid>
 
@@ -286,6 +386,7 @@ const CatequizandoForm = ({
                 label="Apellidos del Responsable"
                 fullWidth
                 disabled={loading}
+                placeholder="Ej: García López"
               />
             </Grid>
 
@@ -295,6 +396,7 @@ const CatequizandoForm = ({
                 label="Teléfono del Responsable"
                 fullWidth
                 disabled={loading}
+                placeholder="Ej: 0987654321"
               />
             </Grid>
 
@@ -310,8 +412,8 @@ const CatequizandoForm = ({
                       label="Relación"
                       disabled={loading}
                     >
-                      <MenuItem value="padre">Padre</MenuItem>
                       <MenuItem value="madre">Madre</MenuItem>
+                      <MenuItem value="padre">Padre</MenuItem>
                       <MenuItem value="tutor">Tutor/a</MenuItem>
                       <MenuItem value="abuelo">Abuelo/a</MenuItem>
                       <MenuItem value="tio">Tío/a</MenuItem>
@@ -325,12 +427,20 @@ const CatequizandoForm = ({
 
             {/* Botones */}
             <Grid item xs={12}>
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 3 }}>
+              <Box sx={{ 
+                display: 'flex', 
+                gap: 2, 
+                justifyContent: 'flex-end', 
+                mt: 3,
+                pt: 3,
+                borderTop: `1px solid ${theme => theme.palette.divider}`
+              }}>
                 <Button
                   variant="outlined"
                   onClick={onCancel}
                   disabled={loading}
                   startIcon={<Cancel />}
+                  size="large"
                 >
                   Cancelar
                 </Button>
@@ -339,6 +449,7 @@ const CatequizandoForm = ({
                   variant="contained"
                   disabled={loading}
                   startIcon={<Save />}
+                  size="large"
                 >
                   {loading ? 'Guardando...' : (initialData ? 'Actualizar' : 'Crear')}
                 </Button>

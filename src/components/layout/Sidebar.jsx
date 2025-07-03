@@ -7,7 +7,9 @@ import {
   ListItemText,
   Divider,
   Typography,
-  Box
+  Box,
+  Chip,
+  useTheme
 } from '@mui/material'
 import {
   Dashboard,
@@ -77,6 +79,7 @@ const Sidebar = ({ open, onClose, variant = 'temporary' }) => {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
+  const theme = useTheme()
 
   const handleNavigation = (path) => {
     navigate(path)
@@ -89,32 +92,112 @@ const Sidebar = ({ open, onClose, variant = 'temporary' }) => {
     item.roles.includes(user?.tipoPerfil)
   )
 
+  const getRoleColor = (role) => {
+    const colors = {
+      admin: 'error',
+      parroco: 'primary',
+      secretaria: 'secondary',
+      catequista: 'success'
+    }
+    return colors[role] || 'default'
+  }
+
+  const getRoleLabel = (role) => {
+    const labels = {
+      admin: 'Administrador',
+      parroco: 'Párroco',
+      secretaria: 'Secretaria',
+      catequista: 'Catequista'
+    }
+    return labels[role] || role
+  }
+
   const drawerContent = (
-    <Box sx={{ width: 250, height: '100%' }}>
-      <Box sx={{ p: 2 }}>
-        <Typography variant="h6" color="primary" fontWeight="bold">
-          Catequesis
+    <Box sx={{ 
+      width: 260, 
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      {/* Header del Sidebar */}
+      <Box sx={{ 
+        p: 3, 
+        background: theme.palette.primary.main,
+        color: 'white'
+      }}>
+        <Typography variant="h5" fontWeight="bold" gutterBottom>
+          ⛪ Catequesis
         </Typography>
-        <Typography variant="body2" color="textSecondary">
-          {user?.tipoPerfil?.toUpperCase()}
+        <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+          {user?.nombres || user?.username}
         </Typography>
+        <Chip 
+          label={getRoleLabel(user?.tipoPerfil)}
+          color={getRoleColor(user?.tipoPerfil)}
+          size="small"
+          sx={{ 
+            color: 'white',
+            fontWeight: 'bold'
+          }}
+        />
       </Box>
       
       <Divider />
       
-      <List>
-        {filteredMenuItems.map((item) => (
-          <ListItem key={item.text} disablePadding>
-            <ListItemButton
-              selected={location.pathname === item.path}
-              onClick={() => handleNavigation(item.path)}
-            >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
+      {/* Menú de navegación */}
+      <List sx={{ flexGrow: 1, pt: 2 }}>
+        {filteredMenuItems.map((item) => {
+          const isSelected = location.pathname === item.path || 
+                           (item.path !== '/dashboard' && location.pathname.startsWith(item.path))
+          
+          return (
+            <ListItem key={item.text} disablePadding sx={{ px: 2, mb: 0.5 }}>
+              <ListItemButton
+                selected={isSelected}
+                onClick={() => handleNavigation(item.path)}
+                sx={{
+                  borderRadius: 2,
+                  '&.Mui-selected': {
+                    backgroundColor: theme.palette.primary.main,
+                    color: 'white',
+                    '& .MuiListItemIcon-root': {
+                      color: 'white',
+                    },
+                    '&:hover': {
+                      backgroundColor: theme.palette.primary.dark,
+                    }
+                  },
+                  '&:hover': {
+                    backgroundColor: theme.palette.action.hover,
+                  }
+                }}
+              >
+                <ListItemIcon sx={{ 
+                  minWidth: 40,
+                  color: isSelected ? 'white' : theme.palette.text.secondary
+                }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText 
+                  primary={item.text}
+                  sx={{
+                    '& .MuiListItemText-primary': {
+                      fontWeight: isSelected ? 600 : 400
+                    }
+                  }}
+                />
+              </ListItemButton>
+            </ListItem>
+          )
+        })}
       </List>
+
+      {/* Footer del Sidebar */}
+      <Box sx={{ p: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
+        <Typography variant="caption" color="textSecondary" align="center" display="block">
+          Sistema de Catequesis v1.0
+        </Typography>
+      </Box>
     </Box>
   )
 
@@ -129,7 +212,9 @@ const Sidebar = ({ open, onClose, variant = 'temporary' }) => {
       sx={{
         '& .MuiDrawer-paper': {
           boxSizing: 'border-box',
-          width: 250,
+          width: 260,
+          border: 'none',
+          boxShadow: variant === 'persistent' ? theme.shadows[3] : 'none'
         },
       }}
     >

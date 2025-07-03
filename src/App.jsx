@@ -14,32 +14,89 @@ import AppLayout from './components/layout/AppLayout'
 import LoadingSpinner from './components/common/LoadingSpinner'
 
 function App() {
-  const { isLoading } = useAuth()
+  const { isLoading, isAuthenticated } = useAuth()
 
   if (isLoading) {
-    return <LoadingSpinner />
+    return <LoadingSpinner message="Iniciando aplicación..." />
   }
 
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
+      {/* Ruta pública de login */}
+      <Route 
+        path="/login" 
+        element={
+          isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />
+        } 
+      />
       
-      <Route path="/" element={
-        <ProtectedRoute>
-          <AppLayout />
-        </ProtectedRoute>
-      }>
-        <Route index element={<Navigate to="/dashboard" replace />} />
+      {/* Rutas protegidas con layout */}
+      <Route 
+        path="/" 
+        element={
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        }
+      >
+        {/* Dashboard como página principal */}
+        <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         
-        <Route path="catequizandos">
-          <Route index element={<CatequizandosPage />} />
-          <Route path="crear" element={<CatequizandoCreatePage />} />
-          <Route path="editar/:id" element={<CatequizandoEditPage />} />
-        </Route>
+        {/* Rutas de catequizandos */}
+        <Route path="catequizandos" element={<CatequizandosPage />} />
+        <Route path="catequizandos/crear" element={<CatequizandoCreatePage />} />
+        <Route path="catequizandos/editar/:id" element={<CatequizandoEditPage />} />
+        
+        {/* Páginas placeholder para otras funcionalidades */}
+        <Route path="grupos" element={
+          <div style={{ padding: '20px', textAlign: 'center' }}>
+            <h2>Grupos</h2>
+            <p>Esta funcionalidad estará disponible próximamente</p>
+          </div>
+        } />
+        
+        <Route path="inscripciones" element={
+          <div style={{ padding: '20px', textAlign: 'center' }}>
+            <h2>Inscripciones</h2>
+            <p>Esta funcionalidad estará disponible próximamente</p>
+          </div>
+        } />
+        
+        <Route path="asistencias" element={
+          <div style={{ padding: '20px', textAlign: 'center' }}>
+            <h2>Asistencias</h2>
+            <p>Esta funcionalidad estará disponible próximamente</p>
+          </div>
+        } />
+        
+        <Route path="reportes" element={
+          <div style={{ padding: '20px', textAlign: 'center' }}>
+            <h2>Reportes</h2>
+            <p>Esta funcionalidad estará disponible próximamente</p>
+          </div>
+        } />
+        
+        <Route path="parroquias" element={
+          <div style={{ padding: '20px', textAlign: 'center' }}>
+            <h2>Parroquias</h2>
+            <p>Esta funcionalidad estará disponible próximamente</p>
+          </div>
+        } />
+        
+        <Route path="usuarios" element={
+          <div style={{ padding: '20px', textAlign: 'center' }}>
+            <h2>Usuarios</h2>
+            <p>Esta funcionalidad estará disponible próximamente</p>
+          </div>
+        } />
       </Route>
 
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Ruta catch-all para manejar rutas no encontradas */}
+      <Route 
+        path="*" 
+        element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} 
+      />
     </Routes>
   )
 }
